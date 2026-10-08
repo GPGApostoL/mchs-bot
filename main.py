@@ -47,7 +47,7 @@ def _mini_app_url() -> str:
 
 MINI_APP_URL = _mini_app_url()
 API_HOST = os.environ.get("API_HOST", "0.0.0.0")
-API_PORT = int(os.environ.get("API_PORT", "8000"))
+API_PORT = int(os.environ.get("PORT") or os.environ.get("API_PORT") or "8000")
 QUESTIONS_PER_TEST = min(50, len(QUIZ_QUESTIONS))
 WEB_DIR = os.path.join(os.path.dirname(__file__), "web")
 
