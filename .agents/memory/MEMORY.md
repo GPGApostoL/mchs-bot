@@ -1,0 +1,1 @@
+- [Telegram service deployment](telegram-service-deployment.md) — Keep bot polling and the Mini App API in one always-running process until polling and session state are externalized.

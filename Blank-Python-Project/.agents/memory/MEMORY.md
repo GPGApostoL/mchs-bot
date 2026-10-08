@@ -1,0 +1,1 @@
+- [Python package/import-name collisions](python-package-import-collisions.md) — verify installed distribution names when package and import names differ.

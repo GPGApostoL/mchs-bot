@@ -1,0 +1,248 @@
+Please replace main.py with this code and install python-telegram-bot:
+
+import random
+from telegram import Update, Poll, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    PollAnswerHandler,
+    CallbackQueryHandler,
+    ContextTypes,
+)
+
+TOKEN = "8909061099:AAEeS9sUuKV1ipsoInzwoPRhfFEBMpM1nk4"
+
+QUIZ_QUESTIONS = [
+    {
+        "question": "Ионизирующее излучение – это…?",
+        "options": [
+            "Излучение, взаимодействие которого с веществом приводит к образованию в этом веществе ионов разного знака",
+            "Излучение, вызывающее исключительно нагревание вещества без изменения структуры",
+            "Световое излучение видимого спектра высокой интенсивности",
+            "Поток заряженных частиц, не взаимодействующих с атомами среды"
+        ],
+        "correct": 0
+    },
+    {
+        "question": "При каком размере материальный ущерб от пожара признается особо крупным?",
+        "options": ["1000 б.в.", "500 б.в.", "250 б.в.", "100 б.в."],
+        "correct": 0
+    },
+    {
+        "question": "Укажите расчетную площадь тушения двумя стволами СВП-4 разлившегося бензина по поверхности…",
+        "options": ["106 м2", "300 м2", "52,66 м2", "140 м2"],
+        "correct": 0
+    },
+    {
+        "question": "Какой предел (эффективной) дозы установлен для лиц категории «население»?",
+        "options": [
+            "1 мЗв/год в среднем за любые 5 лет, но не более 5 мЗв/год",
+            "20 мЗв/год в среднем за любые 5 лет, но не более 50 мЗв/год",
+            "50 мЗв/год",
+            "2,2 мЗв/год"
+        ],
+        "correct": 0
+    },
+    {
+        "question": "Значение температуры вспышки паров жидкости в закрытом тигле, которое служит критерием ее отнесения к легковоспламеняющимся:",
+        "options": ["61", "66", "28", "100"],
+        "correct": 0
+    },
+    {
+        "question": "В течение какого срока с момента окончания подготовки дела об административном правонарушении оно направляется в суд?",
+        "options": ["5 дней", "15 дней", "10 дней", "3 дня"],
+        "correct": 0
+    },
+    {
+        "question": "На какой максимальной скорости разрешается прокладка рукавной линии с АР (АНР)?",
+        "options": ["10 км/ч", "20 км/ч", "5 км/ч", "15 км/ч"],
+        "correct": 0
+    },
+    {
+        "question": "Пожарные гидранты должны быть удалены от обслуживающего здания не более чем на...",
+        "options": ["5 метров", "10 метров", "2,5 метров", "15 метров"],
+        "correct": 0
+    },
+    {
+        "question": "Свет от края люка колодца до верхнего края резьбы ниппеля пожарного гидранта составляет:",
+        "options": ["От 150 мм до 400 мм", "Не менее 200 мм", "От 50 мм до 100 мм", "Не менее 500 мм"],
+        "correct": 0
+    },
+    {
+        "question": "Срок хранения личных дел работников ОПЧС составляет:",
+        "options": ["75 лет", "50 лет", "25 лет", "10 лет"],
+        "correct": 0
+    }
+]
+
+USER_SESSIONS = {}
+
+def create_gold_progress_bar(percent: int) -> str:
+    filled = int(10 * percent // 100)
+    return '🟨' * filled + '⬛' * (10 - filled)
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    await start_new_test(user_id, context, update)
+
+async def start_new_test(user_id: int, context: ContextTypes.DEFAULT_TYPE, update: Update = None):
+    total_count = min(50, len(QUIZ_QUESTIONS))
+    selected_questions = random.sample(QUIZ_QUESTIONS, total_count)
+    
+    USER_SESSIONS[user_id] = {
+        "questions": selected_questions,
+        "current_index": 0,
+        "score": 0,
+        "total": total_count
+    }
+    
+    start_message = (
+        "💎 **КВАЛИФИКАЦИОННОЕ ТЕСТИРОВАНИЕ**\n"
+        "🏛 *Министерство по чрезвычайным ситуациям*\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "📋 **Сведение о сессии:**\n"
+        f"▪️ **Объем выборки:** `{total_count}` вопросов\n"
+        "▪️ **Формат:** Викторина (Instant Feedback)\n"
+        "▪️ **Статус:** Активен\n\n"
+        "⚠️ *Внимание: Выбирайте вариант ответа. Система зафиксирует ваш выбор и подсветит верный ответ.*"
+    )
+    
+    if update and update.message:
+        await update.message.reply_text(start_message, parse_mode="Markdown")
+    else:
+        await context.bot.send_message(chat_id=user_id, text=start_message, parse_mode="Markdown")
+        
+    await send_next_question(context, user_id)
+
+async def send_next_question(context: ContextTypes.DEFAULT_TYPE, user_id: int):
+    session = USER_SESSIONS.get(user_id)
+    if not session:
+        return
+
+    idx = session["current_index"]
+    if idx >= session["total"]:
+        await show_results(context, user_id)
+        return
+
+    qdata = session["questions"][idx]
+    options = qdata["options"].copy()
+    correct_text = options[qdata["correct"]]
+    random.shuffle(options)
+    correct_id = options.index(correct_text)
+
+    session["current_correct_id"] = correct_id
+    question_text = f"⚖️ ВОПРОС [{idx + 1}/{session['total']}]\n\n{qdata['question']}"
+
+    message = await context.bot.send_poll(
+        chat_id=user_id,
+        question=question_text,
+        options=options,
+        type=Poll.QUIZ,
+        correct_option_id=correct_id,
+        is_anonymous=False
+    )
+    
+    context.bot_data[message.poll.id] = {
+        "user_id": user_id,
+        "correct_option_id": correct_id
+    }
+
+async def receive_poll_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    answer = update.poll_answer
+    poll_id = answer.poll_id
+    poll_data = context.bot_data.get(poll_id)
+    
+    if not poll_data:
+        return
+
+    user_id = poll_data["user_id"]
+    session = USER_SESSIONS.get(user_id)
+    if not session:
+        return
+
+    selected_option = answer.option_ids[0]
+    if selected_option == poll_data["correct_option_id"]:
+        session["score"] += 1
+
+    session["current_index"] += 1
+    await send_next_question(context, user_id)
+
+async def show_results(context: ContextTypes.DEFAULT_TYPE, user_id: int):
+    session = USER_SESSIONS.get(user_id)
+    if not session:
+        return
+
+    score = session["score"]
+    total = session["total"]
+    wrong = total - score
+    percent = round((score / total) * 100)
+    
+    if percent >= 90:
+        badge = "👑 **ВЫСШИЙ БАЛЛ / ЭКСПЕРТ**"
+        status_note = "Ваша теоретическая подготовка находится на безупречном уровне."
+    elif percent >= 75:
+        badge = "🥇 **АТТЕСТАЦИЯ ПРОЙДЕНА**"
+        status_note = "Вы продемонстрировали высокий уровень профессиональных знаний."
+    elif percent >= 50:
+        badge = "🥈 **УДОВЛЕТВОРИТЕЛЬНО**"
+        status_note = "Тест сдан, однако рекомендуется повторить отдельные разделы."
+    else:
+        badge = "🛑 **АТТЕСТАЦИЯ НЕ ПРОЙДЕНА**"
+        status_note = "Необходимо детально изучить нормативно-правовую базу."
+
+    progress_bar = create_gold_progress_bar(percent)
+
+    result_card = (
+        "🏆 **ОФИЦИАЛЬНЫЙ ПРОТОКОЛ ТЕСТИРОВАНИЯ**\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"Квалификация: {badge}\n\n"
+        f"Прогресс: {progress_bar} `{percent}%`\n\n"
+        "📊 **Детализация результатов:**\n"
+        f" ▫️ Правильных ответов: `{score}`\n"
+        f" ▫️ Ошибочных ответов: `{wrong}`\n"
+        f" ▫️ Всего обработано: `{total}`\n\n"
+        f"📝 *{status_note}*\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    )
+
+    keyboard = [
+        [
+            InlineKeyboardButton("🔄 Начать новый тест", callback_data="restart_quiz"),
+            InlineKeyboardButton("Завершить", callback_data="finish_quiz")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await context.bot.send_message(
+        chat_id=user_id,
+        text=result_card,
+        reply_markup=reply_markup,
+        parse_mode="Markdown"
+    )
+
+async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+
+    if query.data == "restart_quiz":
+        await query.edit_message_text("⏳ *Формирование новой сессии...*", parse_mode="Markdown")
+        await start_new_test(user_id, context)
+    elif query.data == "finish_quiz":
+        if user_id in USER_SESSIONS:
+            del USER_SESSIONS[user_id]
+        await query.edit_message_text(
+            "🔒 **Сессия завершена.**\n\nДля повторного тестирования воспользуйтесь командой /start.",
+            parse_mode="Markdown"
+        )
+
+def main():
+    app = Application.builder().token(TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(PollAnswerHandler(receive_poll_answer))
+    app.add_handler(CallbackQueryHandler(button_click))
+    print("⚜️ Бот запущен!")
+    app.run_polling()
+
+if __name__ == "__main__":
+    main()

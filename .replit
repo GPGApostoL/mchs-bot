@@ -1,0 +1,38 @@
+modules = ["python-3.11"]
+
+run = "python main.py"
+
+[[ports]]
+localPort = 8000
+externalPort = 80
+
+[nix]
+packages = ["libxcrypt"]
+
+[deployment]
+deploymentTarget = "vm"
+run = ["python3", "main.py"]
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Telegram Mini App"
+
+[[workflows.workflow]]
+name = "Telegram Mini App"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python3 main.py"
+waitForPort = 8000
+
+[workflows.workflow.metadata]
+outputType = "console"
